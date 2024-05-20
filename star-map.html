@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Star Map</title>
+		<style>
+			body { margin: 0; }
+		</style>
+	</head>
+	<body>
+		<div id="object-name-container" style="position: absolute; color: white; text-shadow: 2px 2px black;"></div>
+		<div id="filter-container" style="position: absolute; top: 0; left: 0; color: white;">
+			Dwarfs:
+			<input type="checkbox" id="L" name="L" checked><label for="L">L</label>
+			<input type="checkbox" id="T" name="T" checked><label for="T">T</label>
+			<input type="checkbox" id="Y" name="Y" checked><label for="Y">Y</label>
+			<input type="checkbox" id="D" name="D" checked><label for="D">D</label>
+			<br>
+			Main sequence:
+			<input type="checkbox" id="M" name="M" checked><label for="M">M</label>
+			<input type="checkbox" id="K" name="K" checked><label for="K">K</label>
+			<input type="checkbox" id="G" name="G" checked><label for="G">G</label>
+			<input type="checkbox" id="F" name="F" checked><label for="F">F</label>
+			<input type="checkbox" id="A" name="A" checked><label for="A">A</label>
+			<input type="checkbox" id="B" name="B" checked><label for="B">B</label>
+			<input type="checkbox" id="O" name="O" checked><label for="O">O</label>
+			<br>
+			Go to star:
+			<input type="text" id="name-search" value="">
+		</div>
+        <script src="star-map.js"></script>
+	</body>
+</html>
