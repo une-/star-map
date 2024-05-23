@@ -1,1 +1,5 @@
 node_modules/
+hip.csv
+hip-stars.txt
+*.LICENSE.txt
+*.jar

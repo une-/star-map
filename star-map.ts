@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { STELLAR_CLASSES, StellarClass, getPositionFromRaDec } from './star-utils';
-import { STARS } from './stars';
+// import { STARS } from './stars';
+import { STARS } from './stars-hip';
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -51,27 +52,65 @@ let starSystemColorMap: {[key in StellarClass]: number} = {
     'R': 0xFFFFFF,
     'C': 0xFFFFFF,
     'P': 0xFFFFFF,
+    'N': 0xFFFFFF
 };
 
 let sphereGeometry = new THREE.SphereGeometry(1, 20, 20);
-let starMeshes: {[key in StellarClass]: THREE.InstancedMesh} = <any>{ };
-let starMeshInstanceNameMap: {[key in StellarClass]: string[]} = <any>{ };
-for (let stellarClass of STELLAR_CLASSES) {
-    let starsInClass = STARS.filter((star) => star.class === stellarClass).length;
-    starMeshes[stellarClass] = new THREE.InstancedMesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: starSystemColorMap[stellarClass]}), starsInClass);
-    starMeshes[stellarClass].name = stellarClass;
-    scene.add(starMeshes[stellarClass]);
-    starMeshes[stellarClass].visible = true;
+let starMeshes: {[key in StellarClass]: THREE.InstancedMesh};
+let starMeshInstanceNameMap: {[key in StellarClass]: string[]};
 
-    starMeshInstanceNameMap[stellarClass] = [];
+let filter = {
+    stellarClasses: ['K', 'G', 'F']
+};
+
+function applyFilter(): void {
+    let count = 0;
+    for (let stellarClass of STELLAR_CLASSES) {
+        if (filter.stellarClasses.indexOf(stellarClass) === -1) {
+            starMeshes[stellarClass].visible = false;
+        } else {
+            starMeshes[stellarClass].visible = true;
+            count += starMeshes[stellarClass].count;
+        }
+    }
+    document.getElementById('star-count').innerText = count.toString();
 }
 
-for (let star of STARS) {
-    let i = starMeshInstanceNameMap[star.class].length;
-    let position = new THREE.Matrix4().setPosition(getPositionFromRaDec(star.distance, star.rightAscension, star.declination));
-    starMeshes[star.class].setMatrixAt(i, position);
-    starMeshInstanceNameMap[star.class].push(star.name);
+function buildMeshes() {
+    let cutoff = parseInt((<HTMLInputElement>document.getElementById('distance-cutoff')).value);
+    if (isNaN(cutoff)) cutoff = 200.0;
+    let closeStars = STARS.filter((star) => star.distance <= cutoff && star.distance >= -cutoff);
+    
+    if (starMeshes !== undefined) {
+        for (let stellarClass of STELLAR_CLASSES) {
+            scene.remove(starMeshes[stellarClass]);
+            starMeshes[stellarClass].dispose();
+        }
+    }
+
+    starMeshes = <any>{ };
+    starMeshInstanceNameMap = <any>{ };
+
+    for (let stellarClass of STELLAR_CLASSES) {
+        let starsInClass = closeStars.filter((star) => star.class === stellarClass).length;
+        starMeshes[stellarClass] = new THREE.InstancedMesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: starSystemColorMap[stellarClass]}), starsInClass);
+        starMeshes[stellarClass].name = stellarClass;
+        scene.add(starMeshes[stellarClass]);
+        starMeshes[stellarClass].visible = true;
+    
+        starMeshInstanceNameMap[stellarClass] = [];
+    }
+    
+    for (let star of closeStars) {
+        let i = starMeshInstanceNameMap[star.class].length;
+        let position = new THREE.Matrix4().setPosition(getPositionFromRaDec(star.distance, star.rightAscension, star.declination));
+        starMeshes[star.class].setMatrixAt(i, position);
+        starMeshInstanceNameMap[star.class].push(star.name);
+    }
+
+    applyFilter();
 }
+buildMeshes();
 
 let objectNameContainer = document.getElementById('object-name-container');
 let raycaster = new THREE.Raycaster();
@@ -104,21 +143,6 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-let filter = {
-    stellarClasses: ['K', 'G', 'F']
-};
-
-function applyFilter(): void {
-    for (let stellarClass of STELLAR_CLASSES) {
-        if (filter.stellarClasses.indexOf(stellarClass) === -1) {
-            starMeshes[stellarClass].visible = false;
-        } else {
-            starMeshes[stellarClass].visible = true;
-        }
-    }
-}
-applyFilter();
-
 let stellarClassFilterElements = document.querySelectorAll('#filter-container input') as NodeListOf<HTMLInputElement>;
 for (let i = 0; i < stellarClassFilterElements.length; i++) {
     stellarClassFilterElements[i].addEventListener('change', function() {
@@ -134,6 +158,12 @@ for (let i = 0; i < stellarClassFilterElements.length; i++) {
     stellarClassFilterElements[i].checked = filter.stellarClasses.indexOf(stellarClassFilterElements[i].name) !== -1;
 }
 
+document.getElementById('distance-cutoff').addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        buildMeshes();
+    }
+});
+
 document.getElementById('name-search').addEventListener('keypress', function(event) {
     if (event.key === 'Enter') {
         let nameFilter = (this as HTMLInputElement).value.toUpperCase();
@@ -143,14 +173,21 @@ document.getElementById('name-search').addEventListener('keypress', function(eve
             (this as HTMLInputElement).value = '';
         } else {
             let candidates: { class: StellarClass, i: number }[] = [];
+            let exactMatch: { class: StellarClass, i: number } = undefined;
             for (let stellarClass of STELLAR_CLASSES) {
                 if (filter.stellarClasses.indexOf(stellarClass) === -1) continue;
                 for (let i = 0; i < starMeshInstanceNameMap[stellarClass].length; i++) {
                     if (starMeshInstanceNameMap[stellarClass][i].toUpperCase().indexOf(nameFilter) !== -1) {
                         candidates.push({ class: stellarClass, i: i });
+                        if (starMeshInstanceNameMap[stellarClass][i].toUpperCase() === nameFilter) {
+                            exactMatch = { class: stellarClass, i: i };
+                            break;
+                        }
                     }
                 }
+                if (exactMatch !== undefined) break;
             }
+            if (exactMatch !== undefined) candidates = [exactMatch];
             if (candidates.length === 1) {
                 let starMatrix = new THREE.Matrix4();
                 starMeshes[candidates[0].class].getMatrixAt(candidates[0].i, starMatrix);

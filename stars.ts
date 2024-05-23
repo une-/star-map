@@ -1,3 +1,5 @@
+// stars scraped from Wikipedia
+
 export const STARS: { name: string, class: string, distance: number, rightAscension: number, declination: number }[] = [
     { name: "HIP 2 (HD 224690)", class: "K", distance: 156.4507392, rightAscension: 0.004245, declination: -19.49884 },
     { name: "HIP 18", class: "K", distance: 146.21229979999998, rightAscension: 0.05283, declination: -4.05368 },

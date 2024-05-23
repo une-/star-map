@@ -30,6 +30,7 @@ for (var i = 0; i < rows.length; i++) {
             columnSpan.span--;
         } else {
             var column = columns[columnIndex];
+            if (column === undefined) continue;
             var columnValue = column.innerText;
             rowSpans[j] = { span: column.rowSpan, value: columnValue };
             columnSpan = { span: column.colSpan, value: columnValue };
@@ -67,8 +68,8 @@ A - A-type main sequence star (dwarf star)
 D - white dwarf
 F - F-type main sequence star
 */
-export type StellarClass = 'G' | 'M' | 'K' | 'L' | 'T' | 'Y' | 'A' | 'D' | 'F' | 'B' | 'O' | 'S' | 'W' | 'R' | 'C' | 'P';
-export const STELLAR_CLASSES: StellarClass[] = ['G', 'M', 'K', 'L', 'T', 'Y', 'A', 'D', 'F', 'B', 'O', 'S', 'W', 'R', 'C', 'P'];
+export type StellarClass = 'G' | 'M' | 'K' | 'L' | 'T' | 'Y' | 'A' | 'D' | 'F' | 'B' | 'O' | 'S' | 'W' | 'R' | 'C' | 'P' | 'N';
+export const STELLAR_CLASSES: StellarClass[] = ['G', 'M', 'K', 'L', 'T', 'Y', 'A', 'D', 'F', 'B', 'O', 'S', 'W', 'R', 'C', 'P', 'N'];
 export type LightYears = number;
 export type SiderealTime = string;
 export type Degrees = string;
