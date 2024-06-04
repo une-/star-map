@@ -29,11 +29,37 @@ scene.add(light);
 const light2 = new THREE.AmbientLight(0x0000FF, 0.1);
 scene.add(light2);
 
-let sunGeometry = new THREE.SphereBufferGeometry(1, 20, 20);
+let starPointFragmentShader = `
+uniform vec3 diffuse;
+uniform float opacity;
+
+void main() {
+    float centerDistance = 2.0 * length(gl_PointCoord - vec2(0.5, 0.5));
+    float distanceVertical = abs(gl_PointCoord.x - 0.5);
+    float distanceHorizontal = abs(gl_PointCoord.y - 0.5);
+
+    float a = 1.0 - (centerDistance + (10.0 * min(distanceVertical, distanceHorizontal)));
+    if (a < 0.0) a = 0.0;
+    if (a > 1.0) a = 1.0;
+    a = sin(a * 1.57);
+
+    gl_FragColor = vec4(diffuse, a);
+}
+`;
+
+let sunGeometry = new THREE.SphereBufferGeometry(1, 6, 6);
 let sunMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
 let solMesh = new THREE.Mesh(sunGeometry, sunMaterial);
 solMesh.name = 'Sol';
 scene.add(solMesh);
+
+// attributes = geometry
+// uniforms = material
+
+// let pointsGeometry = new THREE.BufferGeometry();
+// pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+// let points = new THREE.Points(pointsGeometry, pm);
+// scene.add(points);
 
 let starSystemColorMap: {[key in StellarClass]: number} = {
     'G': 0xFFFFFF,
@@ -56,7 +82,8 @@ let starSystemColorMap: {[key in StellarClass]: number} = {
 };
 
 let sphereGeometry = new THREE.SphereGeometry(1, 20, 20);
-let starMeshes: {[key in StellarClass]: THREE.InstancedMesh};
+// let starMeshes: {[key in StellarClass]: THREE.InstancedMesh};
+let starMeshes: {[key in StellarClass]: THREE.Points};
 let starMeshInstanceNameMap: {[key in StellarClass]: string[]};
 
 let filter = {
@@ -64,13 +91,17 @@ let filter = {
 };
 
 function applyFilter(): void {
+    let cutoff = parseInt((<HTMLInputElement>document.getElementById('distance-cutoff')).value);
+    if (isNaN(cutoff)) cutoff = 200.0;
+    let closeStars = STARS.filter((star) => star.distance <= cutoff && star.distance >= -cutoff);
     let count = 0;
     for (let stellarClass of STELLAR_CLASSES) {
         if (filter.stellarClasses.indexOf(stellarClass) === -1) {
             starMeshes[stellarClass].visible = false;
         } else {
             starMeshes[stellarClass].visible = true;
-            count += starMeshes[stellarClass].count;
+            // count += starMeshes[stellarClass].count;
+            count += closeStars.filter((star) => star.class == stellarClass).length;
         }
     }
     document.getElementById('star-count').innerText = count.toString();
@@ -84,7 +115,7 @@ function buildMeshes() {
     if (starMeshes !== undefined) {
         for (let stellarClass of STELLAR_CLASSES) {
             scene.remove(starMeshes[stellarClass]);
-            starMeshes[stellarClass].dispose();
+            // starMeshes[stellarClass].dispose();
         }
     }
 
@@ -92,21 +123,38 @@ function buildMeshes() {
     starMeshInstanceNameMap = <any>{ };
 
     for (let stellarClass of STELLAR_CLASSES) {
-        let starsInClass = closeStars.filter((star) => star.class === stellarClass).length;
-        starMeshes[stellarClass] = new THREE.InstancedMesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: starSystemColorMap[stellarClass]}), starsInClass);
+        let starsInClass = closeStars.filter((star) => star.class === stellarClass);
+        // starMeshes[stellarClass] = new THREE.InstancedMesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: starSystemColorMap[stellarClass]}), starsInClass);
+        // starMeshes[stellarClass] = new THREE.InstancedMesh(sphereGeometry, starMaterial, starsInClass);
+        starMeshInstanceNameMap[stellarClass] = [];
+        let starGeometry = new THREE.BufferGeometry();
+        let points = [];
+        for (let star of starsInClass) {
+            points.push(...getPositionFromRaDec(star.distance, star.rightAscension, star.declination).toArray());
+            starMeshInstanceNameMap[stellarClass].push(star.name);
+        }
+        starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+        let starMaterial = new THREE.PointsMaterial({
+            size: 5.0,
+            transparent: true,
+            color: starSystemColorMap[stellarClass]
+        })
+        starMaterial.onBeforeCompile = (shader) => {
+            shader.fragmentShader = starPointFragmentShader;
+        };
+        starMeshes[stellarClass] = new THREE.Points(starGeometry, starMaterial);
         starMeshes[stellarClass].name = stellarClass;
         scene.add(starMeshes[stellarClass]);
         starMeshes[stellarClass].visible = true;
     
-        starMeshInstanceNameMap[stellarClass] = [];
     }
     
-    for (let star of closeStars) {
-        let i = starMeshInstanceNameMap[star.class].length;
-        let position = new THREE.Matrix4().setPosition(getPositionFromRaDec(star.distance, star.rightAscension, star.declination));
-        starMeshes[star.class].setMatrixAt(i, position);
-        starMeshInstanceNameMap[star.class].push(star.name);
-    }
+    // for (let star of closeStars) {
+    //     let i = starMeshInstanceNameMap[star.class].length;
+    //     let position = new THREE.Matrix4().setPosition(getPositionFromRaDec(star.distance, star.rightAscension, star.declination));
+    //     starMeshes[star.class].setMatrixAt(i, position);
+    //     starMeshInstanceNameMap[star.class].push(star.name);
+    // }
 
     applyFilter();
 }
@@ -125,7 +173,7 @@ renderer.domElement.addEventListener('pointermove', (mouseEvent) => {
         if (intersect.object.name === 'Sol') {
             objectNameContainer.innerText = intersect.object.name;
         } else {
-            objectNameContainer.innerText = starMeshInstanceNameMap[intersect.object.name][intersect.instanceId];
+            objectNameContainer.innerText = starMeshInstanceNameMap[intersect.object.name][intersect.index];
         }
         objectNameContainer.style.left = mouseEvent.clientX + 20 + 'px';
         objectNameContainer.style.top = mouseEvent.clientY + 'px';
@@ -190,7 +238,7 @@ document.getElementById('name-search').addEventListener('keypress', function(eve
             if (exactMatch !== undefined) candidates = [exactMatch];
             if (candidates.length === 1) {
                 let starMatrix = new THREE.Matrix4();
-                starMeshes[candidates[0].class].getMatrixAt(candidates[0].i, starMatrix);
+                // starMeshes[candidates[0].class].getMatrixAt(candidates[0].i, starMatrix);
                 let starPosition = new THREE.Vector3().setFromMatrixPosition(starMatrix);
                 camera.lookAt(starPosition);
                 orbitControls.target = starPosition;
